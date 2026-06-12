@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="zh-Hant-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#EDF1EE">
+<title>臨時需要的一句話</title>
+<link rel="manifest" href="app.webmanifest">
+<link rel="apple-touch-icon" href="icon-192.png">
+<style>
+:root{
+  --paper:#EDF1EE;          /* 卷宗淺青瓷 */
+  --card:#F8FAF8;
+  --ink:#1F2D28;            /* 墨綠黑 */
+  --ink-soft:#5A6B64;
+  --hairline:#CBD6CF;
+  --seal:#BC3B22;           /* 印泥紅:僅用於升級章與高強度 */
+  --seal-bg:#F8E9E5;
+  --low:#3F7A5E;  --low-bg:#E4EFE9;
+  --mid:#9A6B1F;  --mid-bg:#F4ECDC;
+  --serif:"Noto Serif TC","Noto Serif CJK TC",serif;
+  --sans:"Noto Sans TC","PingFang TC","Microsoft JhengHei",system-ui,sans-serif;
+  --mono:ui-monospace,Menlo,monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html{font-size:17px}
+body{font-family:var(--sans);background:var(--paper);color:var(--ink);line-height:1.65;
+  padding-bottom:env(safe-area-inset-bottom)}
+#app{max-width:640px;margin:0 auto;padding:0 16px 48px}
+
+/* ── 頂欄 ── */
+header{display:flex;align-items:baseline;gap:10px;padding:18px 2px 10px;
+  border-bottom:2px solid var(--ink)}
+header h1{font-family:var(--serif);font-size:1.15rem;font-weight:700;letter-spacing:.06em;cursor:pointer}
+header .ver{font-family:var(--mono);font-size:.62rem;color:var(--ink-soft);margin-left:auto}
+header .offline{font-size:.68rem;color:var(--seal);display:none}
+body.is-offline header .offline{display:inline}
+
+/* ── 密碼頁 ── */
+.gate{margin-top:18vh;text-align:center}
+.gate h2{font-family:var(--serif);font-size:1.4rem;margin-bottom:6px}
+.gate p{color:var(--ink-soft);font-size:.85rem;margin-bottom:24px}
+.gate input{width:100%;max-width:300px;font-size:1.2rem;text-align:center;letter-spacing:.3em;
+  padding:12px;border:1.5px solid var(--hairline);border-radius:8px;background:var(--card);color:var(--ink)}
+.gate button{display:block;margin:16px auto 0;font-size:1rem;padding:12px 44px;border:none;
+  border-radius:8px;background:var(--ink);color:var(--paper);font-family:var(--sans);cursor:pointer}
+.gate .err{color:var(--seal);font-size:.85rem;margin-top:12px;min-height:1.4em}
+
+/* ── 首頁:釘選/最近 ── */
+.home-label{font-size:.7rem;letter-spacing:.25em;color:var(--ink-soft);margin:26px 0 10px;
+  display:flex;align-items:center;gap:8px}
+.home-label::after{content:"";flex:1;border-top:1px solid var(--hairline)}
+.chip-row{display:flex;flex-wrap:wrap;gap:8px}
+.chip{font-size:.85rem;padding:8px 14px;border:1px solid var(--hairline);border-radius:999px;
+  background:var(--card);cursor:pointer;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.empty-hint{color:var(--ink-soft);font-size:.82rem}
+
+/* ── 主題卡 ── */
+.theme-card{display:block;width:100%;text-align:left;background:var(--card);border:1px solid var(--hairline);
+  border-left:5px solid var(--ink);border-radius:10px;padding:20px 18px;margin-top:12px;cursor:pointer}
+.theme-card h3{font-family:var(--serif);font-size:1.25rem}
+.theme-card span{font-size:.78rem;color:var(--ink-soft)}
+
+/* ── 分類頁籤 ── */
+.tabs{display:flex;gap:6px;margin:18px 0 4px;position:sticky;top:0;background:var(--paper);
+  padding:10px 0;z-index:5;border-bottom:1px solid var(--hairline)}
+.tab{flex:1;font-size:.9rem;padding:9px 4px;text-align:center;border:1px solid var(--hairline);
+  border-radius:8px;background:var(--card);color:var(--ink-soft);cursor:pointer}
+.tab.on{background:var(--ink);color:var(--paper);border-color:var(--ink);font-weight:500}
+.section-note{font-size:.78rem;color:var(--ink-soft);margin:10px 2px 4px}
+
+/* ── 觸發句卡(列表) ── */
+.trig{display:block;width:100%;text-align:left;background:var(--card);border:1px solid var(--hairline);
+  border-radius:10px;padding:16px 16px 13px;margin-top:10px;cursor:pointer;position:relative}
+.trig .q{font-family:var(--serif);font-size:1.12rem;font-weight:700;line-height:1.5}
+.trig .meta{display:flex;gap:8px;margin-top:7px;align-items:center}
+.trig .bt{font-size:.66rem;color:var(--ink-soft);border:1px solid var(--hairline);
+  border-radius:4px;padding:1px 6px}
+.trig .pin-mark{margin-left:auto;font-size:.8rem;color:var(--mid)}
+.trig:active{background:var(--low-bg)}
+
+/* ── 卡片詳情 ── */
+.back{font-size:.85rem;color:var(--ink-soft);background:none;border:none;padding:14px 2px;cursor:pointer}
+.detail-trig{font-family:var(--serif);font-size:1.45rem;font-weight:700;line-height:1.45;margin:4px 0 2px}
+.detail-meta{display:flex;gap:10px;align-items:center;margin:8px 0 18px;flex-wrap:wrap}
+.detail-meta .bt{font-size:.7rem;color:var(--ink-soft);border:1px solid var(--hairline);border-radius:4px;padding:2px 8px}
+.pin-btn{font-size:.8rem;padding:5px 14px;border-radius:999px;border:1px solid var(--hairline);
+  background:var(--card);cursor:pointer}
+.pin-btn.on{background:var(--mid-bg);border-color:var(--mid);color:var(--mid)}
+
+.line{background:var(--card);border:1px solid var(--hairline);border-radius:10px;
+  padding:15px 16px;margin-top:10px;position:relative}
+.line .txt{font-size:1.18rem;line-height:1.7}
+.line .row{display:flex;align-items:center;gap:8px;margin-top:10px;flex-wrap:wrap}
+.badge{font-size:.68rem;padding:2px 9px;border-radius:4px;font-weight:500}
+.badge.i低{background:var(--low-bg);color:var(--low)}
+.badge.i中{background:var(--mid-bg);color:var(--mid)}
+.badge.i高{background:var(--seal-bg);color:var(--seal)}
+/* 升級章:印章樣式(本作品的 signature) */
+.stamp{font-family:var(--serif);font-size:.72rem;font-weight:700;color:var(--seal);
+  border:2px solid var(--seal);border-radius:4px;padding:2px 8px;letter-spacing:.12em;
+  transform:rotate(-2.5deg);background:transparent}
+.copy{margin-left:auto;font-size:.74rem;padding:5px 13px;border-radius:6px;cursor:pointer;
+  border:1px solid var(--hairline);background:var(--paper);color:var(--ink-soft)}
+.copy.done{background:var(--low-bg);color:var(--low);border-color:var(--low)}
+.esc-note{font-size:.78rem;color:var(--seal);background:var(--seal-bg);border-radius:6px;
+  padding:8px 11px;margin-top:9px;line-height:1.55}
+
+.block-label{font-size:.7rem;letter-spacing:.25em;color:var(--ink-soft);margin:24px 0 8px;
+  display:flex;align-items:center;gap:8px}
+.block-label::after{content:"";flex:1;border-top:1px solid var(--hairline)}
+.block-label.danger{color:var(--seal)}
+.avoid-item{background:var(--card);border:1px solid var(--hairline);border-left:4px solid var(--seal);
+  border-radius:8px;padding:11px 14px;margin-top:8px;font-size:.95rem}
+.note-box{font-size:.92rem;color:var(--ink);background:var(--card);border:1px dashed var(--hairline);
+  border-radius:8px;padding:12px 14px;margin-top:8px}
+.legal{font-family:var(--mono);font-size:.68rem;color:var(--ink-soft);margin-top:20px}
+
+.toast{position:fixed;left:50%;bottom:36px;transform:translateX(-50%);background:var(--ink);
+  color:var(--paper);font-size:.85rem;padding:9px 20px;border-radius:999px;opacity:0;
+  pointer-events:none;transition:opacity .25s;z-index:99}
+.toast.show{opacity:.95}
+@media (prefers-reduced-motion: reduce){*{transition:none!important}}
+@media (min-width:600px){html{font-size:18px}}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<div class="toast" id="toast"></div>
+<script>
+/* ════════ 設定:部署 GAS 後,把網址貼到這裡 ════════ */
+const GAS_URL = "PASTE_YOUR_GAS_WEB_APP_URL_HERE";
+/* ════════════════════════════════════════════════ */
+
+const LS = {
+  pw:"phrase_pw", data:"phrase_data", ver:"phrase_ver",
+  pins:"phrase_pins", recents:"phrase_recents"
+};
+const $app = document.getElementById("app");
+let DATA = null;            // {data_version, themes:[...]}
+let nav = { view:"home", themeId:null, sectionId:null, cardId:null };
+
+/* ── 工具 ── */
+const get = k => { try { return JSON.parse(localStorage.getItem(k)); } catch(e){ return null; } };
+const set = (k,v) => localStorage.setItem(k, JSON.stringify(v));
+const esc = s => (s??"").toString().replace(/[&<>"]/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+function toast(msg){ const t=document.getElementById("toast"); t.textContent=msg;
+  t.classList.add("show"); setTimeout(()=>t.classList.remove("show"),1600); }
+
+function allCards(){
+  const out=[];
+  (DATA?.themes||[]).forEach(t=>(t.sections||[]).forEach(s=>(s.cards||[]).forEach(c=>
+    out.push({...c, _theme:t, _section:s}))));
+  return out;
+}
+const findCard = id => allCards().find(c=>c.id===id);
+
+/* ── 資料取得 ── */
+async function fetchData(pw){
+  const res = await fetch(GAS_URL, {
+    method:"POST",
+    headers:{"Content-Type":"text/plain;charset=utf-8"},   // simple request,免 preflight
+    body: JSON.stringify({ pw })
+  });
+  const j = await res.json();
+  if(!j.ok) throw new Error(j.error || "驗證失敗");
+  return j;
+}
+async function refreshSilently(){
+  const pw = get(LS.pw); if(!pw || GAS_URL.startsWith("PASTE")) return;
+  try{
+    const j = await fetchData(pw);
+    if(j.data_version !== get(LS.ver)){
+      set(LS.data, j); set(LS.ver, j.data_version);
+      DATA = j; render();
+      toast("語庫已更新");
+    }
+  }catch(e){ /* 離線或暫時失敗:沿用快取,不打擾 */ }
+}
+
+/* ── 畫面 ── */
+function render(){
+  document.body.classList.toggle("is-offline", !navigator.onLine);
+  if(!DATA){ renderGate(); return; }
+  const head = `
+    <header>
+      <h1 onclick="go('home')">臨時需要的一句話</h1>
+      <span class="offline">離線(快取資料)</span>
+      <span class="ver">v${esc(String(DATA.data_version||"").slice(0,7))}</span>
+    </header>`;
+  if(nav.view==="home")    $app.innerHTML = head + viewHome();
+  if(nav.view==="theme")   $app.innerHTML = head + viewTheme();
+  if(nav.view==="card")    $app.innerHTML = head + viewCard();
+  window.scrollTo(0,0);
+}
+
+function renderGate(msg=""){
+  $app.innerHTML = `
+    <div class="gate">
+      <h2>臨時需要的一句話</h2>
+      <p>輸入密碼以載入語庫(僅首次需要)</p>
+      <input id="pw" type="password" inputmode="text" autocomplete="current-password">
+      <button onclick="unlock()">進入</button>
+      <div class="err">${esc(msg)}</div>
+    </div>`;
+  const inp = document.getElementById("pw");
+  inp.focus();
+  inp.addEventListener("keydown", e=>{ if(e.key==="Enter") unlock(); });
+}
+async function unlock(){
+  const pw = document.getElementById("pw").value.trim();
+  if(!pw) return;
+  if(GAS_URL.startsWith("PASTE")){ renderGate("尚未設定 GAS_URL(見 index.html 開頭)"); return; }
+  document.querySelector(".gate .err").textContent = "驗證中…";
+  try{
+    const j = await fetchData(pw);
+    set(LS.pw, pw); set(LS.data, j); set(LS.ver, j.data_version);
+    DATA = j; nav = {view:"home"}; render();
+  }catch(e){ renderGate(e.message==="Failed to fetch" ? "連線失敗,請確認網路" : e.message); }
+}
+
+function viewHome(){
+  const pins = (get(LS.pins)||[]).map(findCard).filter(Boolean);
+  const recents = (get(LS.recents)||[]).map(findCard).filter(Boolean).slice(0,6);
+  const chip = c => `<button class="chip" onclick="openCard('${c.id}')">${esc(c.trigger)}</button>`;
+  return `
+    <div class="home-label">釘選</div>
+    ${pins.length ? `<div class="chip-row">${pins.map(chip).join("")}</div>`
+                  : `<p class="empty-hint">在卡片裡點「釘選」,常用句就會固定在這。</p>`}
+    <div class="home-label">最近使用</div>
+    ${recents.length ? `<div class="chip-row">${recents.map(chip).join("")}</div>`
+                     : `<p class="empty-hint">還沒有使用紀錄。</p>`}
+    <div class="home-label">主題</div>
+    ${DATA.themes.map(t=>{
+      const n = (t.sections||[]).reduce((a,s)=>a+(s.cards||[]).length,0);
+      return `<button class="theme-card" onclick="openTheme('${esc(t.theme_id)}')">
+        <h3>${esc(t.theme)}</h3><span>${(t.sections||[]).map(s=>esc(s.section_name)).join("・")}|${n} 張卡</span>
+      </button>`;
+    }).join("")}`;
+}
+
+function viewTheme(){
+  const t = DATA.themes.find(x=>x.theme_id===nav.themeId); if(!t) return "";
+  const secs = [...(t.sections||[])].sort((a,b)=>(a.display_order||0)-(b.display_order||0));
+  if(!nav.sectionId) nav.sectionId = secs[0]?.section_id;
+  const s = secs.find(x=>x.section_id===nav.sectionId) || secs[0];
+  const pins = get(LS.pins)||[];
+  return `
+    <button class="back" onclick="go('home')">← 回首頁</button>
+    <div class="tabs">${secs.map(x=>
+      `<button class="tab ${x.section_id===s.section_id?"on":""}"
+        onclick="openSection('${esc(x.section_id)}')">${esc(x.section_name)}</button>`).join("")}</div>
+    ${s.note ? `<p class="section-note">${esc(s.note)}</p>` : ""}
+    ${(s.cards||[]).map(c=>`
+      <button class="trig" onclick="openCard('${c.id}')">
+        <div class="q">${esc(c.trigger)}</div>
+        <div class="meta">
+          ${c.behavior_type ? `<span class="bt">${esc(c.behavior_type)}</span>` : ""}
+          ${c.lines?.some(l=>l.escalation) ? `<span class="stamp">升級</span>` : ""}
+          ${pins.includes(c.id) ? `<span class="pin-mark">📌</span>` : ""}
+        </div>
+      </button>`).join("")}`;
+}
+
+function viewCard(){
+  const c = findCard(nav.cardId); if(!c) return "";
+  const pins = get(LS.pins)||[];
+  const pinned = pins.includes(c.id);
+  const order = {"低":0,"中":1,"高":2};
+  const lines = [...(c.lines||[])].sort((a,b)=>(order[a.intensity]??9)-(order[b.intensity]??9));
+  return `
+    <button class="back" onclick="openTheme('${esc(c._theme.theme_id)}','${esc(c._section.section_id)}')">← ${esc(c._section.section_name)}</button>
+    <div class="detail-trig">${esc(c.trigger)}</div>
+    <div class="detail-meta">
+      ${c.behavior_type?`<span class="bt">${esc(c.behavior_type)}</span>`:""}
+      <button class="pin-btn ${pinned?"on":""}" onclick="togglePin('${c.id}')">${pinned?"已釘選 📌":"釘選"}</button>
+    </div>
+    ${lines.map((l,i)=>`
+      <div class="line">
+        <div class="txt">${esc(l.text)}</div>
+        <div class="row">
+          <span class="badge i${esc(l.intensity)}">強度 ${esc(l.intensity)}</span>
+          ${l.escalation?`<span class="stamp">${esc(l.escalation)}</span>`:""}
+          <button class="copy" onclick="copyLine(this,'${c.id}',${i})">複製</button>
+        </div>
+        ${l.escalation_note?`<div class="esc-note">${esc(l.escalation_note)}</div>`:""}
+      </div>`).join("")}
+    ${(c.avoid&&c.avoid.length)?`
+      <div class="block-label danger">避免說法</div>
+      ${c.avoid.map(a=>`<div class="avoid-item">${esc(a)}</div>`).join("")}`:""}
+    ${c.usage_note?`
+      <div class="block-label">使用提醒</div>
+      <div class="note-box">${esc(c.usage_note)}</div>`:""}
+    ${c.legal_source?`<div class="legal">法源:${esc(c.legal_source)}${c.verified_date?` (查核 ${esc(c.verified_date)})`:""}</div>`:""}`;
+}
+
+/* ── 導覽與動作(全域,給 inline handler 用) ── */
+window.go = v => { nav={view:v}; render(); };
+window.openTheme = (tid, sid) => { nav={view:"theme",themeId:tid,sectionId:sid||null}; render(); };
+window.openSection = sid => { nav.sectionId=sid; render(); };
+window.openCard = id => {
+  const c=findCard(id); if(!c) return;
+  let r=(get(LS.recents)||[]).filter(x=>x!==id); r.unshift(id); set(LS.recents,r.slice(0,12));
+  nav={view:"card",cardId:id,themeId:c._theme.theme_id,sectionId:c._section.section_id}; render();
+};
+window.togglePin = id => {
+  let p=get(LS.pins)||[];
+  p = p.includes(id) ? p.filter(x=>x!==id) : [...p,id];
+  set(LS.pins,p); render();
+};
+window.copyLine = async (btn,cardId,idx) => {
+  const c=findCard(cardId);
+  const order={"低":0,"中":1,"高":2};
+  const lines=[...(c.lines||[])].sort((a,b)=>(order[a.intensity]??9)-(order[b.intensity]??9));
+  try{ await navigator.clipboard.writeText(lines[idx].text);
+       btn.textContent="已複製"; btn.classList.add("done");
+       setTimeout(()=>{btn.textContent="複製";btn.classList.remove("done");},1500);
+  }catch(e){ toast("複製失敗,請長按選取"); }
+};
+window.unlock = unlock;
+
+/* ── 啟動 ── */
+(function boot(){
+  DATA = get(LS.data);
+  render();
+  refreshSilently();                       // 永遠先顯示快取,背景靜默更新
+  window.addEventListener("online",  ()=>{ document.body.classList.remove("is-offline"); refreshSilently(); });
+  window.addEventListener("offline", ()=>document.body.classList.add("is-offline"));
+  if("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(()=>{});
+})();
+</script>
+</body>
+</html>
