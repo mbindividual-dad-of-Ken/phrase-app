@@ -143,7 +143,8 @@ let nav = { view:"home", themeId:null, sectionId:null, cardId:null };
 /* ── 工具 ── */
 const get = k => { try { return JSON.parse(localStorage.getItem(k)); } catch(e){ return null; } };
 const set = (k,v) => localStorage.setItem(k, JSON.stringify(v));
-const esc = s => (s??"").toString().replace(/[&<>"]/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+/* 【修正】esc 補上單引號跳脫：id 會進單引號包的 inline onclick，含 ' 時整張卡按鈕全滅（手冊法則7 單引號家族） */
+const esc = s => (s??"").toString().replace(/[&<>"']/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 function toast(msg){ const t=document.getElementById("toast"); t.textContent=msg;
   t.classList.add("show"); setTimeout(()=>t.classList.remove("show"),1600); }
 
@@ -156,16 +157,30 @@ function allCards(){
 const findCard = id => allCards().find(c=>c.id===id);
 
 /* ── 資料取得 ── */
+/* 【修正】補 res.ok 與 JSON 解析防呆：GAS 部署異常回 HTML 錯誤頁時，
+   原本會把原始 SyntaxError 直接顯示給使用者。
+   另：錯誤物件帶 kind 屬性（"auth"），讓 refreshSilently 能區分「密碼失效」與「網路問題」。 */
 async function fetchData(pw){
   const res = await fetch(GAS_URL, {
     method:"POST",
     headers:{"Content-Type":"text/plain;charset=utf-8"},   // simple request,免 preflight
     body: JSON.stringify({ pw })
   });
-  const j = await res.json();
-  if(!j.ok) throw new Error(j.error || "驗證失敗");
+  if(!res.ok) throw new Error("伺服器回應異常("+res.status+")，請稍後再試");
+  let j;
+  try{ j = await res.json(); }
+  catch(e){ throw new Error("伺服器回應格式異常，請稍後再試"); }
+  if(!j.ok){
+    const err = new Error(j.error || "驗證失敗");
+    if((j.error||"").indexOf("密碼") !== -1) err.kind = "auth";
+    throw err;
+  }
   return j;
 }
+/* 【修正】原本把「密碼錯誤」也當成離線靜默吞掉——後台換密碼後，
+   App 會永遠凍結在舊資料且無任何訊號（手冊法則1延伸規則：
+   後端回 UNAUTHORIZED 必須清除本地失效金鑰並要求重新驗證）。
+   現在：auth 錯誤 → 清除已存密碼＋toast 提示；其餘（離線/暫時失敗）維持靜默沿用快取。 */
 async function refreshSilently(){
   const pw = get(LS.pw); if(!pw || GAS_URL.startsWith("PASTE")) return;
   try{
@@ -175,7 +190,13 @@ async function refreshSilently(){
       DATA = j; render();
       toast("語庫已更新");
     }
-  }catch(e){ /* 離線或暫時失敗:沿用快取,不打擾 */ }
+  }catch(e){
+    if(e.kind === "auth"){
+      localStorage.removeItem(LS.pw);           // 快取資料保留可離線用，僅要求重新驗證
+      toast("密碼已變更，更新語庫請重新輸入密碼");
+    }
+    /* 其餘:離線或暫時失敗,沿用快取,不打擾 */
+  }
 }
 
 /* ── 畫面 ── */
@@ -222,7 +243,7 @@ async function unlock(){
 function viewHome(){
   const pins = (get(LS.pins)||[]).map(findCard).filter(Boolean);
   const recents = (get(LS.recents)||[]).map(findCard).filter(Boolean).slice(0,6);
-  const chip = c => `<button class="chip" onclick="openCard('${c.id}')">${esc(c.trigger)}</button>`;
+  const chip = c => `<button class="chip" onclick="openCard('${esc(c.id)}')">${esc(c.trigger)}</button>`; /* 【修正】id 過 esc */
   return `
     <div class="home-label">釘選</div>
     ${pins.length ? `<div class="chip-row">${pins.map(chip).join("")}</div>`
@@ -252,7 +273,7 @@ function viewTheme(){
         onclick="openSection('${esc(x.section_id)}')">${esc(x.section_name)}</button>`).join("")}</div>
     ${s.note ? `<p class="section-note">${esc(s.note)}</p>` : ""}
     ${(s.cards||[]).map(c=>`
-      <button class="trig" onclick="openCard('${c.id}')">
+      <button class="trig" onclick="openCard('${esc(c.id)}')"> <!-- 【修正】id 過 esc -->
         <div class="q">${esc(c.trigger)}</div>
         <div class="meta">
           ${c.behavior_type ? `<span class="bt">${esc(c.behavior_type)}</span>` : ""}
@@ -273,7 +294,7 @@ function viewCard(){
     <div class="detail-trig">${esc(c.trigger)}</div>
     <div class="detail-meta">
       ${c.behavior_type?`<span class="bt">${esc(c.behavior_type)}</span>`:""}
-      <button class="pin-btn ${pinned?"on":""}" onclick="togglePin('${c.id}')">${pinned?"已釘選 📌":"釘選"}</button>
+      <button class="pin-btn ${pinned?"on":""}" onclick="togglePin('${esc(c.id)}')">${pinned?"已釘選 📌":"釘選"}</button>
     </div>
     ${lines.map((l,i)=>`
       <div class="line">
@@ -281,7 +302,7 @@ function viewCard(){
         <div class="row">
           <span class="badge i${esc(l.intensity)}">強度 ${esc(l.intensity)}</span>
           ${l.escalation?`<span class="stamp">${esc(l.escalation)}</span>`:""}
-          <button class="copy" onclick="copyLine(this,'${c.id}',${i})">複製</button>
+          <button class="copy" data-text="${esc(l.text)}" onclick="copyLine(this)">複製</button> <!-- 【修正】改用 data-text，消除與 viewCard 各自排序的 index 耦合 -->
         </div>
         ${l.escalation_note?`<div class="esc-note">${esc(l.escalation_note)}</div>`:""}
       </div>`).join("")}
@@ -308,11 +329,10 @@ window.togglePin = id => {
   p = p.includes(id) ? p.filter(x=>x!==id) : [...p,id];
   set(LS.pins,p); render();
 };
-window.copyLine = async (btn,cardId,idx) => {
-  const c=findCard(cardId);
-  const order={"低":0,"中":1,"高":2};
-  const lines=[...(c.lines||[])].sort((a,b)=>(order[a.intensity]??9)-(order[b.intensity]??9));
-  try{ await navigator.clipboard.writeText(lines[idx].text);
+/* 【修正】原本 copyLine 重複 viewCard 的排序邏輯、以 index 對位——兩邊只要有一邊改動，
+   複製到的就是別句話。現改為渲染時把句子放進按鈕 data-text，排序邏輯只剩一份。 */
+window.copyLine = async (btn) => {
+  try{ await navigator.clipboard.writeText(btn.dataset.text);
        btn.textContent="已複製"; btn.classList.add("done");
        setTimeout(()=>{btn.textContent="複製";btn.classList.remove("done");},1500);
   }catch(e){ toast("複製失敗,請長按選取"); }
